@@ -1,4 +1,5 @@
 temp/
 .venv/
 data/
-task.md
+/task.md
+/GenAI_Takeaway_Assignment.pdf
