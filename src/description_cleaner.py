@@ -1,3 +1,10 @@
+"""Clean raw HTML job descriptions into structured text suitable for LLM summarization.
+
+The workflow here converts HTML content into plain text, preserves likely section
+headers, strips generic boilerplate language, and writes one JSONL record per job
+with a cleaned description field.
+"""
+
 from __future__ import annotations
 import html
 import json
@@ -26,6 +33,7 @@ HEADER_TAGS = {"b", "strong"}
 
 
 def _is_probable_header(text: str) -> bool:
+    """Heuristic used to detect section labels such as Responsibilities or Requirements."""
     text = text.strip()
     if not text or len(text) > 60:
         return False
@@ -36,9 +44,12 @@ def _is_probable_header(text: str) -> bool:
 
 
 def html_to_structured_text(raw_html: str) -> str:
-    """Walk the parsed HTML and emit plain text with '## Header' markers for
-    likely section headers and '- item' markers for list items, so section
-    boundaries survive even though the source has no real heading tags."""
+    """Convert HTML into a readable text form that preserves headings and item lists.
+
+    The function traverses the DOM tree, recognizes likely section headers,
+    formats them as `## Header`, and emits list items as `- ...` so downstream
+    LLM prompts retain structure.
+    """
     if not raw_html or not isinstance(raw_html, str):
         return ""
 
@@ -118,6 +129,7 @@ def html_to_structured_text(raw_html: str) -> str:
 
 
 def normalize_whitespace(text: str) -> str:
+    """Normalize repeated whitespace while preserving meaningful line breaks."""
     text = html.unescape(text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = "\n".join(line.strip() for line in text.split("\n"))
@@ -126,12 +138,14 @@ def normalize_whitespace(text: str) -> str:
 
 
 def strip_boilerplate(text: str) -> str:
+    """Remove repeated recruitment boilerplate and legal footer language."""
     for pattern in BOILERPLATE_PATTERNS:
         text = re.sub(pattern, "", text, flags=re.IGNORECASE | re.DOTALL)
     return text
 
 
 def clean_one(raw_html: str, strip_bp: bool) -> str:
+    """Apply the full HTML-to-text cleaning workflow to a single job description."""
     text = html_to_structured_text(raw_html)
     text = normalize_whitespace(text)
     if strip_bp:
@@ -141,6 +155,7 @@ def clean_one(raw_html: str, strip_bp: bool) -> str:
 
 
 def main():
+    """Run the cleaning pass over the input workbook and write the cleaned JSONL output."""
     in_path = Path(INPUT_XLSX)
     if not in_path.exists():
         sys.exit(f"Input file not found: {in_path}")

@@ -1,6 +1,14 @@
+"""Prepare the raw Excel workbook for the RAG pipeline.
+
+The script splits the source dataset into a metadata table and a separate job
+summary table, fills missing locations with a default value, and exports the
+cleaned files used by later preprocessing steps.
+"""
+
 import pandas as pd
 
 def load_data(file_path):
+    """Read the raw workbook and return the metadata and description tables."""
     df = pd.read_excel(file_path)
     description = df[['ID','Job Description']]
     df = df.drop(columns=['Tags', 'Job Description'], axis=1)

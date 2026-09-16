@@ -1,3 +1,9 @@
+"""FastAPI application for the job-postings RAG demo.
+
+The app exposes a query endpoint for retrieving and answering job-related
+questions, and serves a lightweight HTML interface for browser-based testing.
+"""
+
 from typing import List, Optional
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
@@ -31,6 +37,7 @@ class QueryResponse(BaseModel):
 
 @app.post("/api/query", response_model=QueryResponse)
 def query(req: QueryRequest):
+    """Answer a question using semantic retrieval plus optional metadata filters."""
     filters = {
         "job_level": req.job_level,
         "job_location": req.job_location,
@@ -132,6 +139,7 @@ document.getElementById('question').addEventListener('keydown', (e) => {
 
 @app.get("/", response_class=HTMLResponse)
 def index():
+    """Serve the single-page browser interface for the RAG demo."""
     return INDEX_HTML
 
 

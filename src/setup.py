@@ -1,3 +1,10 @@
+"""Run the preprocessing and indexing pipeline in the required order.
+
+This script executes each stage of the data preparation workflow sequentially so
+that metadata, cleaned descriptions, and final Groq-enriched summaries are built
+in a predictable order.
+"""
+
 import os
 import subprocess
 import sys

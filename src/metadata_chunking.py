@@ -1,3 +1,10 @@
+"""Create the metadata index used to seed the ChromaDB collection.
+
+This script reads the cleaned metadata workbook, keeps the job-identifying fields,
+serializes them into JSONL, and upserts the minimal searchable record for each
+job before the detailed description summaries are added later in the pipeline.
+"""
+
 import json
 import os
 import pandas as pd
@@ -11,6 +18,7 @@ DB_PATH = "D:\Assignment\RAG\Data\chroma_db"
 COLLECTION_NAME = "job_postings"
 
 def get_collection(db_path: str, collection_name: str):
+    """Return the persistent Chroma collection used for metadata seeding."""
     client = chromadb.PersistentClient(path=db_path)
     return client.get_or_create_collection(
         name=collection_name,
@@ -47,6 +55,11 @@ def build_minimal_doc(data: dict) -> str:
 
 
 def convert_to_single_jsonl(df, output_filepath):
+    """Write a JSONL file and upsert the placeholder metadata rows into Chroma.
+
+    The placeholder documents are intentionally minimal so the indexing pipeline can
+    resume safely before Groq-generated summaries are added.
+    """
 
     os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
 

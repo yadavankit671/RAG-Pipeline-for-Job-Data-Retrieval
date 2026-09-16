@@ -1,11 +1,15 @@
+"""Retrieve the most relevant job postings and synthesize grounded answers.
+
+This module wraps ChromaDB retrieval and the Ollama model. It converts raw user
+queries into semantic search calls, optionally applies metadata filters, and
+returns both the generated answer and the source job IDs that supported it.
+"""
+
 from __future__ import annotations
 
 import chromadb
 import ollama
 
-# =============================================================================
-# CONFIG -- must match metadata_chunker.py / description_chunker.py
-# =============================================================================
 DB_PATH = r"D:\Assignment\RAG\Data\chroma_db"
 COLLECTION_NAME = "job_postings"
 OLLAMA_MODEL = "llama3.1" 
@@ -16,6 +20,7 @@ _collection = None  # lazy singleton -- avoid reopening the DB on every call
 
 
 def get_collection():
+    """Return a cached Chroma collection for all retrieval calls in this process."""
     global _collection
     if _collection is None:
         client = chromadb.PersistentClient(path=DB_PATH)
@@ -27,8 +32,10 @@ def get_collection():
 
 
 def build_where(filters: dict | None) -> dict | None:
-    """Turn {"job_level": "Senior Level", "job_location": "New York, NY"}
-    into Chroma's `where` filter syntax. Empty/None values are dropped."""
+    """Translate a simple metadata filter dictionary into Chroma ``where`` syntax.
+
+    Example input: {"job_level": "Senior Level", "job_location": "New York, NY"}
+    """
     if not filters:
         return None
     conditions = [{k: v} for k, v in filters.items() if v]
@@ -40,9 +47,11 @@ def build_where(filters: dict | None) -> dict | None:
 
 
 def retrieve(query: str, top_k: int = TOP_K_DEFAULT, filters: dict | None = None) -> list[dict]:
-    """Semantic search over the DB. Returns a list of dicts, each with the
-    job's metadata, its chunk_text, and a similarity distance (lower =
-    more similar, cosine distance)."""
+    """Run semantic retrieval and return the top matching jobs.
+
+    Each result includes the job ID, document chunk text, metadata fields, and the
+    cosine distance score. Lower distance means a more similar match.
+    """
     collection = get_collection()
     where = build_where(filters)
 
@@ -77,6 +86,7 @@ Rules:
 
 
 def format_context(retrieved: list[dict]) -> str:
+    """Convert retrieved records into a compact prompt context block for the LLM."""
     blocks = []
     for r in retrieved:
         blocks.append(
@@ -86,6 +96,7 @@ def format_context(retrieved: list[dict]) -> str:
 
 
 def generate_answer(query: str, retrieved: list[dict]) -> str:
+    """Generate a grounded answer using only the retrieved job postings as context."""
     if not retrieved:
         return "I couldn't find any job postings relevant to that question."
 
@@ -104,8 +115,7 @@ def generate_answer(query: str, retrieved: list[dict]) -> str:
 
 
 def answer_question(query: str, top_k: int = TOP_K_DEFAULT, filters: dict | None = None) -> dict:
-    """Convenience wrapper: retrieve then generate, returning both the
-    answer and the sources it was grounded in (for citation display)."""
+    """Retrieve relevant jobs and return a grounded response with citation metadata."""
     retrieved = retrieve(query, top_k=top_k, filters=filters)
     answer = generate_answer(query, retrieved)
     return {
