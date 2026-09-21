@@ -202,7 +202,7 @@ def summarize_description(description_text: str, job_title: str, company_name: s
             for key in ("about_company", "responsibilities", "requirements", "benefits", "compensation"):
                 data.setdefault(key, None)
                 
-            time.sleep(2.5)
+            # time.sleep(2.5) # we dont need it since we are using local model
             
             return data
             
