@@ -14,27 +14,26 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from groq import Groq
 import chromadb
+import ollama
 
 METADATA_FILE = "D:\Assignment\RAG\Data\json\metadata.jsonl"
 DESCRIPTIONS_FILE = "D:\Assignment\RAG\Data\json\description_clean.jsonl"
 DB_PATH = "D:\Assignment\RAG\Data\chroma_db"
 COLLECTION_NAME = "job_postings"
 
-# Prefer a real environment variable so API credentials are not hard-coded into
-# source files. Fall back to an empty string to keep local development simple.
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = "openai/gpt-oss-20b"
+
+# GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+# GROQ_MODEL = "openai/gpt-oss-20b"
+OLLAMA_MODEL ="qwen2.5:1.5b" # "llama3.2:3B"
 CONCURRENCY = 1
 
 LIMIT = None                       
 AUDIT_FILE = "chunks.jsonl"        
-
 TEST_QUERY = None
 TEST_FILTER = None
 
-client = Groq(api_key=GROQ_API_KEY)
+
 
 SYSTEM_PROMPT = """You are extracting and summarizing structured information from a job \
 posting for a retrieval system. You will be given the cleaned text of one job \
@@ -162,7 +161,7 @@ def sanitize_metadata(meta: dict) -> dict:
 
 def summarize_description(description_text: str, job_title: str, company_name: str,
                         max_retries: int = 3) -> dict:
-    """Ask Groq to summarize a single job posting into structured fields.
+    """Ask Ollama to summarize a single job posting into structured fields.
 
     The returned dictionary matches the schema expected by the retrieval index and
     contains company overview, responsibilities, requirements, benefits, and
@@ -188,17 +187,16 @@ def summarize_description(description_text: str, job_title: str, company_name: s
     last_err = None
     for attempt in range(1, max_retries + 1):
         try:
-            resp = client.chat.completions.create(
-                model=GROQ_MODEL,
+            resp = ollama.chat(
+                model=OLLAMA_MODEL,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_msg},
                 ],
-                response_format={"type": "json_object"}, 
-                temperature=0,
+                format = CHUNK_SCHEMA
             )
             
-            content = resp.choices[0].message.content
+            content = resp["message"]["content"]
             data = json.loads(content)
 
             for key in ("about_company", "responsibilities", "requirements", "benefits", "compensation"):
@@ -292,8 +290,8 @@ def ingest():
         sys.exit(f"Metadata file not found: {meta_path}")
     if not desc_path.exists():
         sys.exit(f"Cleaned descriptions file not found: {desc_path}. Run description_cleaner.py first.")
-    if Groq is None:
-        sys.exit("Missing dependency. Run: pip install groq")
+    if ollama is None:
+        sys.exit("Missing dependency. Run: pip install ollama")
 
     metadata = load_jsonl(meta_path)
     descriptions = load_jsonl(desc_path)
@@ -309,7 +307,7 @@ def ingest():
         print("Nothing to do -- every job in metadata.jsonl is already in the DB.")
         return
 
-    print(f"Summarizing {len(job_ids)} jobs with '{GROQ_MODEL}' ({len(done_ids)} already in DB, skipping)...")
+    print(f"Summarizing {len(job_ids)} jobs with '{OLLAMA_MODEL}' ({len(done_ids)} already in DB, skipping)...")
 
     results = []
     with ThreadPoolExecutor(max_workers=CONCURRENCY) as executor:
@@ -324,7 +322,7 @@ def ingest():
                 results.append(future.result())
                 n_done += 1
                 print(f"[{jid}] processed successfully.")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  
                 n_err += 1
                 print(f"[ERROR] {jid}: {e}", file=sys.stderr)
             if (n_done + n_err) % 25 == 0:
