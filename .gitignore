@@ -1,4 +1,7 @@
 temp/
 .venv/
 private/
+
+# Generated RAG data
 /Data/chroma_db/
+/src/chunks.jsonl
